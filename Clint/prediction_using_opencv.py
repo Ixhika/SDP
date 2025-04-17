@@ -38,7 +38,7 @@ class AutoCheckoutSystem:
 
         cred = credentials.Certificate('autocheckouts_firebase_credential.json')
         firebase_admin.initialize_app(cred, {
-            'databaseURL': 'your link to firebase'
+            'databaseURL': 'Real TIme fireBase URL'
         })
 
     def set_video_path(self, path):
@@ -50,11 +50,14 @@ class AutoCheckoutSystem:
     def get_all_items(self):
         return self.stack
 
-    def set_end_point_url(self, url_):
-        self.url = url_
+    def set_end_point_url(self, url):
+        self.url = url
 
     def set_time_out_threshold(self, time_out):
         self.time_out_threshold_value = float(time_out)
+
+    def db_reference(self, db_name):
+        return db.reference(f'/{db_name}/{self.user_id}')
 
     def predict_frame(self, frame):
         try:
@@ -93,12 +96,12 @@ class AutoCheckoutSystem:
 
     def wait_until_cart_deleted(self):
         start_time = time.time()
-        cart_ref = db.reference(f'/cart/{self.user_id}')
+        cart_ref = self.db_reference('cart')
         print('⏰ Waiting To check out the items before time out ...')
 
         while time.time() - start_time < self.time_out_threshold_value:
             if not cart_ref.get():
-                print(f"✔️ Congratulations You have successfully checkout the items, Receipt will be mailed to you. Thanks you!")
+                print("✔️ Congratulations You have successfully checkout the items! \nReceipt will get e-mail to you. Thanks you!")
                 return True
             time.sleep(5)
 
@@ -110,7 +113,8 @@ class AutoCheckoutSystem:
             print("❌ Invalid or empty video path or user is not defined. Exiting function.")
             return
 
-        cap = cv2.VideoCapture(self.video_path)
+        # cap = cv2.VideoCapture(self.video_path)
+        cap = cv2.VideoCapture(self.video_path, cv2.CAP_FFMPEG)
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
@@ -119,7 +123,7 @@ class AutoCheckoutSystem:
             pred_class = self.predict_frame(frame)
             status = self.custom_push(pred_class)
             if not status:
-                cart_ref = db.reference(f'/cart/{self.user_id}')
+                cart_ref = self.db_reference('cart')
                 if cart_ref.get():
                     cart_ref.delete()
                 return
@@ -129,10 +133,11 @@ class AutoCheckoutSystem:
 
             cv2.imshow(f'Vision Transformer Prediction for id {self.user_id}', frame)
             if cv2.waitKey(25) & 0xFF == ord('q'):
-                cart_ref = db.reference(f'/cart/{self.user_id}')
-                if cart_ref.get():
-                    cart_ref.delete()
-                return
+                break;
+                # cart_ref = self.db_reference('cart')
+                # if cart_ref.get():
+                #     cart_ref.delete()
+                # return
 
         cap.release()
         cv2.destroyAllWindows()
